@@ -1,7 +1,3 @@
-<p align="center">
-  <img src="public/screenshots/logo_pmi.png" width="120" alt="Logo PMI Kudus">
-</p>
-
 <h1 align="center">
   <br>
   🩸 SP3 — Sistem Prediksi Pendonor Potensial
