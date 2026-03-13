@@ -37,7 +37,7 @@ class CreateDataPendonor extends Migration
             ],
             'golongan_darah' => [
                 'type'       => 'ENUM',
-                'constraint' => ['A+', 'B+', 'AB+', 'O+'],
+                'constraint' => ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'],
             ],
             'kecamatan' => [
                 'type'       => 'VARCHAR',

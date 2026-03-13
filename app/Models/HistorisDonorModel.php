@@ -25,8 +25,7 @@ class HistorisDonorModel extends Model
     protected $useTimestamps = false;
     protected $createdField  = 'created_at';
     protected $updatedField  = 'updated_at';
-
-    protected $beforeInsert = ['generateId'];
+    protected $beforeInsert  = ['generateId'];
 
     protected $useSoftDeletes   = false;
     protected $protectFields    = true;
@@ -34,20 +33,17 @@ class HistorisDonorModel extends Model
     protected bool $allowEmptyInserts = false;
     protected bool $updateOnlyChanged = true;
 
-    protected array $casts = [];
+    protected array $casts        = [];
     protected array $castHandlers = [];
 
-    // Dates
-    protected $dateFormat    = 'datetime';
-    protected $deletedField  = 'deleted_at';
+    protected $dateFormat   = 'datetime';
+    protected $deletedField = 'deleted_at';
 
-    // Validation
     protected $validationRules      = [];
     protected $validationMessages   = [];
     protected $skipValidation       = false;
     protected $cleanValidationRules = true;
 
-    // Callbacks
     protected $allowCallbacks = true;
     protected $afterInsert    = [];
     protected $beforeUpdate   = [];
@@ -57,11 +53,51 @@ class HistorisDonorModel extends Model
     protected $beforeDelete   = [];
     protected $afterDelete    = [];
 
-    protected function generateId(array $data)
+    protected function generateId(array $data): array
     {
-        if (! isset($data['data']['id_histori'])) {
+        if (!isset($data['data']['id_histori'])) {
             $data['data']['id_histori'] = 'HSD-' . strtoupper(bin2hex(random_bytes(4)));
         }
         return $data;
+    }
+
+    /**
+     * Ambil data dengan join pendonor, filter opsional
+     */
+    public function getWithPendonor(array $filters = []): array
+    {
+        $builder = $this->db->table('data_historis_donor h')
+            ->select('h.*, p.nama_pendonor, p.id_pendonor_pusat')
+            ->join('data_pendonor p', 'p.id_pendonor = h.id_pendonor');
+
+        if (!empty($filters['status_donor'])) {
+            $builder->where('h.status_donor', $filters['status_donor']);
+        }
+        if (!empty($filters['status_pengesahan'])) {
+            $builder->where('h.status_pengesahan', $filters['status_pengesahan']);
+        }
+        if (!empty($filters['baru_ulang'])) {
+            $builder->where('h.baru_ulang', $filters['baru_ulang']);
+        }
+        if (!empty($filters['tanggal_dari'])) {
+            $builder->where('DATE(h.tanggal_donor) >=', $filters['tanggal_dari']);
+        }
+        if (!empty($filters['tanggal_sampai'])) {
+            $builder->where('DATE(h.tanggal_donor) <=', $filters['tanggal_sampai']);
+        }
+
+        return $builder->orderBy('h.tanggal_donor', 'DESC')->get()->getResultArray();
+    }
+
+    /**
+     * Hapus semua historis donor (truncate aman tanpa FK issue karena
+     * historis_donor adalah tabel child, bukan parent)
+     */
+    public function truncateAll(): void
+    {
+        $db = $this->db;
+        $db->query('SET FOREIGN_KEY_CHECKS=0');
+        $db->table($this->table)->truncate();
+        $db->query('SET FOREIGN_KEY_CHECKS=1');
     }
 }

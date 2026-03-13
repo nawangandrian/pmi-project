@@ -41,31 +41,34 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <?php $no = 1; foreach ($users as $u): ?>
-                        <tr>
-                            <td><?= $no++ ?></td>
-                            <td><?= esc($u['username']) ?></td>
-                            <td>
-                                <span class="badge bg-<?= $u['role'] === 'infokom' ? 'info' : 'success' ?>">
-                                    <?= strtoupper($u['role']) ?>
-                                </span>
-                            </td>
-                            <td><?= date('d-m-Y H:i', strtotime($u['created_at'])) ?></td>
-                            <td class="text-center">
-                                <div class="d-flex justify-content-center gap-2">
-                                    <button class="btn btn-warning btn-sm btnEdit rounded-pill"
-                                        data-id="<?= $u['id_user'] ?>">
-                                        <i class="fas fa-edit"></i>
-                                    </button>
+                        <?php $no = 1;
+                        if (!empty($users)): ?>
+                            <?php foreach ($users as $u): ?>
+                                <tr>
+                                    <td><?= $no++ ?></td>
+                                    <td><?= esc($u['username']) ?></td>
+                                    <td>
+                                        <span class="badge bg-<?= $u['role'] === 'infokom' ? 'info' : 'success' ?>">
+                                            <?= strtoupper($u['role']) ?>
+                                        </span>
+                                    </td>
+                                    <td><?= date('d-m-Y H:i', strtotime($u['created_at'])) ?></td>
+                                    <td class="text-center">
+                                        <div class="d-flex justify-content-center gap-2">
+                                            <button class="btn btn-warning btn-sm btnEdit rounded-pill"
+                                                data-id="<?= $u['id_user'] ?>">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
 
-                                    <button class="btn btn-danger btn-sm btnDelete rounded-pill"
-                                        data-id="<?= $u['id_user'] ?>">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
-                        <?php endforeach ?>
+                                            <button class="btn btn-danger btn-sm btnDelete rounded-pill"
+                                                data-id="<?= $u['id_user'] ?>">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            <?php endforeach ?>
+                        <?php endif; ?>
                     </tbody>
                 </table>
             </div>
@@ -150,7 +153,7 @@
                         <label>Password (Opsional)</label>
 
                         <div class="input-group">
-                            <input type="password" name="password" id="password_edit" class="form-control">
+                            <input type="password" name="password" id="password_edit" class="form-control" autocomplete="new-password">
                             <span class="input-group-text" id="togglePasswordEdit" style="cursor:pointer">
                                 <i class="fas fa-eye"></i>
                             </span>
@@ -183,103 +186,110 @@
 
 <?= $this->section('script') ?>
 <script>
-$(function () {
-    $(document).on('click', '.toggle-password', function () {
-        const input = $(this).closest('.input-group').find('.password-field');
-        const icon  = $(this).find('i');
+    $(function() {
+        $(document).on('click', '.toggle-password', function() {
+            const input = $(this).closest('.input-group').find('.password-field');
+            const icon = $(this).find('i');
 
-        if (input.attr('type') === 'password') {
-            input.attr('type', 'text');
-            icon.removeClass('fa-eye').addClass('fa-eye-slash');
-        } else {
-            input.attr('type', 'password');
-            icon.removeClass('fa-eye-slash').addClass('fa-eye');
-        }
-    });
-    $('#togglePasswordEdit').on('click', function () {
-        const input = $('#password_edit');
-        const icon = $(this).find('i');
-
-        if (input.attr('type') === 'password') {
-            input.attr('type', 'text');
-            icon.removeClass('fa-eye').addClass('fa-eye-slash');
-        } else {
-            input.attr('type', 'password');
-            icon.removeClass('fa-eye-slash').addClass('fa-eye');
-        }
-    });
-
-    $('#tblUser').DataTable({
-        responsive: true,
-        autoWidth: false,
-        columnDefs: [{ targets: 4, orderable: false }]
-    });
-
-    // CREATE
-    $('#btnSave').click(function () {
-        $('.text-danger').html('');
-
-        $.post("<?= site_url('user/store') ?>", $('#formStore').serialize(), function (res) {
-            if (res.status === 'error_validation') {
-                $.each(res.errors, function (f, m) {
-                    $('.error-' + f + '-store').html(m);
-                });
-                return;
-            }
-
-            Swal.fire('Berhasil', res.message, 'success')
-                .then(() => location.reload());
-        }, 'json');
-    });
-
-    // GET DATA
-    $('.btnEdit').click(function () {
-        let id = $(this).data('id');
-
-        $.post("<?= site_url('user/getData') ?>", { id }, function (res) {
-            $('#edit_id').val(res.id_user);
-            $('#edit_username').val(res.username);
-            $('#edit_role').val(res.role);
-            $('#modalEdit').modal('show');
-        }, 'json');
-    });
-
-    // UPDATE
-    $('#btnUpdate').click(function () {
-        $('.text-danger').html('');
-
-        $.post("<?= site_url('user/update') ?>", $('#formEdit').serialize(), function (res) {
-            if (res.status === 'error_validation') {
-                $.each(res.errors, function (f, m) {
-                    $('.error-' + f + '-edit').html(m);
-                });
-                return;
-            }
-
-            Swal.fire('Updated', res.message, 'success')
-                .then(() => location.reload());
-        }, 'json');
-    });
-
-    // DELETE
-    $('.btnDelete').click(function () {
-        let id = $(this).data('id');
-
-        Swal.fire({
-            title: 'Hapus user?',
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonText: 'Hapus'
-        }).then(res => {
-            if (res.isConfirmed) {
-                $.post("<?= site_url('user/delete') ?>", { id }, function (r) {
-                    Swal.fire('Deleted', r.message, 'success')
-                        .then(() => location.reload());
-                }, 'json');
+            if (input.attr('type') === 'password') {
+                input.attr('type', 'text');
+                icon.removeClass('fa-eye').addClass('fa-eye-slash');
+            } else {
+                input.attr('type', 'password');
+                icon.removeClass('fa-eye-slash').addClass('fa-eye');
             }
         });
-    });
+        $('#togglePasswordEdit').on('click', function() {
+            const input = $('#password_edit');
+            const icon = $(this).find('i');
 
-});
+            if (input.attr('type') === 'password') {
+                input.attr('type', 'text');
+                icon.removeClass('fa-eye').addClass('fa-eye-slash');
+            } else {
+                input.attr('type', 'password');
+                icon.removeClass('fa-eye-slash').addClass('fa-eye');
+            }
+        });
+
+        $('#tblUser').DataTable({
+            responsive: true,
+            autoWidth: false,
+            columnDefs: [{
+                targets: 4,
+                orderable: false
+            }]
+        });
+
+        // CREATE
+        $('#btnSave').click(function() {
+            $('.text-danger').html('');
+
+            $.post("<?= site_url('user/store') ?>", $('#formStore').serialize(), function(res) {
+                if (res.status === 'error_validation') {
+                    $.each(res.errors, function(f, m) {
+                        $('.error-' + f + '-store').html(m);
+                    });
+                    return;
+                }
+
+                Swal.fire('Berhasil', res.message, 'success')
+                    .then(() => location.reload());
+            }, 'json');
+        });
+
+        // GET DATA
+        $('.btnEdit').click(function() {
+            let id = $(this).data('id');
+
+            $.post("<?= site_url('user/getData') ?>", {
+                id
+            }, function(res) {
+                $('#edit_id').val(res.id_user);
+                $('#edit_username').val(res.username);
+                $('#edit_role').val(res.role);
+                $('#modalEdit').modal('show');
+            }, 'json');
+        });
+
+        // UPDATE
+        $('#btnUpdate').click(function() {
+            $('.text-danger').html('');
+
+            $.post("<?= site_url('user/update') ?>", $('#formEdit').serialize(), function(res) {
+                if (res.status === 'error_validation') {
+                    $.each(res.errors, function(f, m) {
+                        $('.error-' + f + '-edit').html(m);
+                    });
+                    return;
+                }
+
+                Swal.fire('Updated', res.message, 'success')
+                    .then(() => location.reload());
+            }, 'json');
+        });
+
+        // DELETE
+        $('.btnDelete').click(function() {
+            let id = $(this).data('id');
+
+            Swal.fire({
+                title: 'Hapus user?',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Hapus'
+            }).then(res => {
+                if (res.isConfirmed) {
+                    $.post("<?= site_url('user/delete') ?>", {
+                        id
+                    }, function(r) {
+                        Swal.fire('Deleted', r.message, 'success')
+                            .then(() => location.reload());
+                    }, 'json');
+                }
+            });
+        });
+
+    });
 </script>
 <?= $this->endSection() ?>

@@ -23,7 +23,7 @@ class UserController extends BaseController
             ->findAll();
 
         return view('pages/user/index', [
-            'title' => 'Manajemen User',
+            'title' => 'Manajemen User | SP3 (Sistem Prediksi Pendonor Potensial)',
             'users' => $users
         ]);
     }

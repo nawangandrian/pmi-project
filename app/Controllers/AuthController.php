@@ -4,10 +4,11 @@ namespace App\Controllers;
 
 use App\Controllers\BaseController;
 use App\Models\UserModel;
+use App\Models\ModelPrediksiModel;
 
 class AuthController extends BaseController
 {
-    protected $userModel;
+    protected UserModel $userModel;
 
     public function __construct()
     {
@@ -16,30 +17,38 @@ class AuthController extends BaseController
     }
 
     /**
-     * Tampilkan halaman login
+     * Halaman login — route: GET /login
+     * Hanya menampilkan form login, tanpa data landing page.
      */
-    public function index()
+    public function index(): string|\CodeIgniter\HTTP\RedirectResponse
     {
         if (session()->get('logged_in')) {
             return redirect()->to('/dashboard');
         }
-        return view('pages/auth/index');
+        // ── Model aktif ──────────────────────────────────────
+        $modelPrediksiModel = new ModelPrediksiModel();
+        $modelAktif         = $modelPrediksiModel->getAktif();
+
+        return view('pages/auth/index', [
+            'modelAktif'      => $modelAktif,
+        ]);
     }
 
     /**
-     * Proses login (AJAX)
+     * Proses login — AJAX POST
+     * Route: POST /login/attempt
      */
-    public function authenticate()
+    public function authenticate(): \CodeIgniter\HTTP\ResponseInterface
     {
         $rules = [
             'login'    => 'required',
-            'password' => 'required|min_length[6]'
+            'password' => 'required|min_length[6]',
         ];
 
         if (! $this->validate($rules)) {
             return $this->response->setJSON([
                 'status' => 'error_validation',
-                'errors' => $this->validator->getErrors()
+                'errors' => $this->validator->getErrors(),
             ]);
         }
 
@@ -51,35 +60,34 @@ class AuthController extends BaseController
         if (! $user) {
             return $this->response->setJSON([
                 'status'  => 'error',
-                'message' => 'Akun tidak ditemukan.'
+                'message' => 'Akun tidak ditemukan.',
             ]);
         }
 
         if (! password_verify($password, $user['password'])) {
             return $this->response->setJSON([
                 'status'  => 'error',
-                'message' => 'Password salah.'
+                'message' => 'Password salah.',
             ]);
         }
 
-        // SET SESSION
         session()->set([
-            'id_user'   => $user['id_user'], // USR-XXXX
+            'id_user'   => $user['id_user'],
             'username'  => $user['username'],
             'role'      => $user['role'],
-            'logged_in' => true
+            'logged_in' => true,
         ]);
 
         return $this->response->setJSON([
             'status'  => 'success',
-            'message' => 'Login berhasil.'
+            'message' => 'Login berhasil.',
         ]);
     }
 
     /**
-     * Logout
+     * Logout — Route: GET /logout
      */
-    public function logout()
+    public function logout(): \CodeIgniter\HTTP\RedirectResponse
     {
         session()->destroy();
         return redirect()->to('/login');
