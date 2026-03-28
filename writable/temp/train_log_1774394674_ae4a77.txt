@@ -1,0 +1,6 @@
+[INFO] Data dimuat: 816 baris, kolom: ['id_pendonor', 'tanggal_donor', 'jumlah_donor', 'baru_ulang', 'status_donor', 'status_pengesahan', 'nama_pendonor', 'umur', 'jenis_kelamin', 'golongan_darah', 'kecamatan']
+[INFO] Distribusi label: {'0': 685, '1': 131}
+[INFO] Train: 652, Val: 164
+[INFO] Akurasi: 0.872, F1: 0.6038, AUC: 0.8835
+[INFO] CV AUC: 0.8766 (scores: [0.93944309 0.88798428 0.85752386 0.81414935 0.88377316])
+[INFO] Model tersimpan: C:\laragon\www\ci4-donor\writable\models/model_1774394674_ae4a77.joblib

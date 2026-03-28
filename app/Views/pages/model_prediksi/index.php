@@ -60,7 +60,7 @@
                 <strong>Python tersedia.</strong> Training model dapat dilakukan langsung di sistem ini.
             <?php else: ?>
                 <strong>Python tidak ditemukan.</strong>
-                Install Python 3 + library: <code>pip install scikit-learn pandas numpy joblib</code>
+                Install Python 3 + library: <code>pip install scikit-learn pandas numpy joblib matplotlib</code>
             <?php endif ?>
         </div>
         <button class="btn btn-sm btn-outline-<?= $pythonReady ? 'success' : 'danger' ?> ms-auto" id="btnCekPython">
@@ -229,7 +229,7 @@
 </div>
 
 <!-- ====================================================
-     MODAL TAMBAH — compact, no scroll
+     MODAL TAMBAH
 ===================================================== -->
 <div class="modal fade" id="modalAdd" tabindex="-1">
     <div class="modal-dialog modal-lg modal-compact">
@@ -354,7 +354,7 @@
 </div>
 
 <!-- ====================================================
-     MODAL EDIT — compact, no scroll
+     MODAL EDIT
 ===================================================== -->
 <div class="modal fade" id="modalEdit" tabindex="-1">
     <div class="modal-dialog modal-lg modal-compact">
@@ -477,7 +477,7 @@
 </div>
 
 <!-- ====================================================
-     MODAL TRAINING — dengan real progress bar
+     MODAL TRAINING
 ===================================================== -->
 <div class="modal fade" id="modalTraining" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-lg">
@@ -487,30 +487,34 @@
             </div>
             <div class="modal-body">
 
-                <div class="alert alert-info small mb-3">
+                <!--
+                    INFO TRAINING
+                    Baris ini menampilkan ringkasan data yang akan/sudah digunakan.
+                    - Sebelum training: tampilkan total keseluruhan sebagai acuan awal
+                    - Setelah training: JS akan mengupdate angka ini dengan data aktual hasil filter
+                -->
+                <div class="alert alert-info small mb-3" id="trainingInfoAlert">
                     <i class="fas fa-info-circle me-1"></i>
-                    Training menggunakan <strong><?= number_format($totalHistoris) ?> data historis</strong> dan
-                    <strong><?= number_format($totalPendonor) ?> data pendonor</strong>.
-                    Data difilter sesuai konfigurasi model. Proses 30–120 detik.
+                    <span id="trainingInfoText">
+                        Data keseluruhan: <strong><?= number_format($totalHistoris) ?> historis</strong>
+                        dan <strong><?= number_format($totalPendonor) ?> pendonor</strong>.
+                        Jumlah aktual akan disesuaikan dengan filter konfigurasi model.
+                        Proses 30–120 detik.
+                    </span>
                 </div>
 
-                <!-- ── Area progress ─────────────────────────── -->
+                <!-- Area progress -->
                 <div id="trainingProgress">
                     <div class="text-center mb-3">
-                        <!-- Angka persentase besar -->
                         <div id="trainingPersen" class="text-primary">0%</div>
                         <div id="trainingStepText">Mempersiapkan...</div>
                         <div id="trainingElapsed">Waktu berjalan: 0 detik</div>
                     </div>
-
-                    <!-- Progress bar -->
                     <div class="progress progress-wrap" style="height:22px; border-radius:6px;">
                         <div id="trainingBar"
                              class="progress-bar progress-bar-striped progress-bar-animated bg-primary progress-bar-training"
                              role="progressbar" style="width:0%">0%</div>
                     </div>
-
-                    <!-- Langkah-langkah kecil -->
                     <div class="d-flex justify-content-between mt-2 px-1" style="font-size:10px; color:#aaa;">
                         <span>Load data</span>
                         <span>Proses fitur</span>
@@ -518,13 +522,12 @@
                         <span>Cross-val</span>
                         <span>Simpan</span>
                     </div>
-
                     <p class="text-muted small text-center mt-3 mb-0">
                         <i class="fas fa-lock me-1"></i>Jangan menutup halaman ini selama proses berlangsung.
                     </p>
                 </div>
 
-                <!-- ── Hasil training ─────────────────────────── -->
+                <!-- Hasil training -->
                 <div id="trainingResult" style="display:none">
                     <div class="text-center mb-3">
                         <i class="fas fa-check-circle fa-3x text-success mb-2"></i>
@@ -535,7 +538,7 @@
                     <div class="mt-3 p-3 bg-light rounded small" id="resultInfo"></div>
                 </div>
 
-                <!-- ── Error ──────────────────────────────────── -->
+                <!-- Error -->
                 <div id="trainingError" style="display:none">
                     <div class="alert alert-danger">
                         <i class="fas fa-times-circle me-1"></i>
@@ -546,7 +549,7 @@
                         <strong>Solusi umum:</strong>
                         <ul class="mb-0">
                             <li>Pastikan Python 3 terinstall: <code>python3 --version</code></li>
-                            <li>Install library: <code>pip install scikit-learn pandas numpy joblib</code></li>
+                            <li>Install library: <code>pip install scikit-learn pandas numpy joblib matplotlib</code></li>
                             <li>Pastikan filter data tidak terlalu ketat (minimal 20 data)</li>
                         </ul>
                     </div>
@@ -571,11 +574,14 @@
 <script>
 $(function () {
 
-    let lastTrainedId   = '';
-    let pollTimer       = null;     // interval polling progress
-    let elapsedTimer    = null;     // interval hitung waktu
-    let elapsedSec      = 0;
-    let currentTs       = '';       // token unik training session
+    let lastTrainedId = '';
+    let pollTimer     = null;
+    let elapsedTimer  = null;
+    let elapsedSec    = 0;
+
+    // Total global dari PHP (dipakai sebagai acuan awal sebelum training)
+    const TOTAL_HISTORIS = <?= (int) $totalHistoris ?>;
+    const TOTAL_PENDONOR = <?= (int) $totalPendonor ?>;
 
     // ── DataTable ─────────────────────────────────────────────
     $('#tblModel').DataTable({
@@ -583,35 +589,25 @@ $(function () {
         columnDefs: [{ targets: [9], orderable: false }]
     });
 
-    // ── Helper: update progress bar ───────────────────────────
+    // ── Helpers progress bar ──────────────────────────────────
     function setProgress(persen, step) {
         persen = Math.min(100, Math.max(0, parseInt(persen) || 0));
         $('#trainingPersen').text(persen + '%');
         $('#trainingStepText').text(step || '...');
-        $('#trainingBar')
-            .css('width', persen + '%')
-            .text(persen + '%')
-            .attr('aria-valuenow', persen);
-
-        // Ubah warna bar di akhir
+        $('#trainingBar').css('width', persen + '%').text(persen + '%').attr('aria-valuenow', persen);
         if (persen >= 100) {
-            $('#trainingBar')
-                .removeClass('bg-primary progress-bar-animated')
-                .addClass('bg-success');
+            $('#trainingBar').removeClass('bg-primary progress-bar-animated').addClass('bg-success');
         }
     }
 
-    // ── Helper: mulai polling progress ke server ───────────────
     function startPolling(ts) {
-        currentTs = ts;
         pollTimer = setInterval(function () {
-            $.post('<?= site_url('model-prediksi/trainingProgress') ?>', { ts: ts }, function (res) {
+            $.post('<?= site_url('model-prediksi/trainingProgress') ?>', { ts }, function (res) {
                 if (res) setProgress(res.persen, res.step);
-            }, 'json').fail(function () { /* abaikan error jaringan sementara */ });
+            }, 'json');
         }, 1500);
     }
 
-    // ── Helper: mulai timer elapsed ───────────────────────────
     function startElapsed() {
         elapsedSec   = 0;
         elapsedTimer = setInterval(function () {
@@ -620,12 +616,10 @@ $(function () {
         }, 1000);
     }
 
-    // ── Helper: hentikan semua timer ──────────────────────────
     function stopTimers() {
         clearInterval(pollTimer);
         clearInterval(elapsedTimer);
-        pollTimer   = null;
-        elapsedTimer = null;
+        pollTimer = elapsedTimer = null;
     }
 
     // ── Cek Python ────────────────────────────────────────────
@@ -662,25 +656,25 @@ $(function () {
         const id = $(this).data('id');
         $.post('<?= site_url('model-prediksi/getData') ?>', { id }, function (res) {
             if (! res) return;
-            const p = res.parameter_model || {};
             $('#edit_id').val(res.id_model);
             $('#edit_nama').val(res.nama_model);
             $('#edit_ket').val(res.keterangan);
-            $('#edit_ne').val(p.n_estimators     ?? 400);
-            $('#edit_msl').val(p.min_samples_leaf ?? 2);
-            $('#edit_cw').val(p.class_weight      ?? 'balanced');
-            $('#edit_rs').val(p.random_state      ?? 42);
-            $('#edit_ts').val(p.test_size         ?? 0.2);
-            $('#edit_ad').val(p.alpha_donor        ?? 0.2);
-            $('#edit_au').val(p.alpha_ulang        ?? 0.1);
-
-            const savedGol = p.filter_golongan_darah ?? [];
-            $('.edit-gol').each(function () { $(this).prop('checked', savedGol.includes($(this).val())); });
-            $('#edit_kecamatan').val(p.filter_kecamatan        ?? '');
-            $('#edit_jk').val(p.filter_jenis_kelamin            ?? '');
-            $('#edit_tgl_dari').val(p.filter_tanggal_dari       ?? '');
-            $('#edit_tgl_sampai').val(p.filter_tanggal_sampai   ?? '');
-            $('#edit_min_donor').val(p.filter_min_jumlah_donor  ?? 1);
+            $('#edit_ne').val(res.n_estimators      ?? 400);
+            $('#edit_msl').val(res.min_samples_leaf ?? 2);
+            $('#edit_cw').val(res.class_weight      ?? 'balanced');
+            $('#edit_rs').val(res.random_state      ?? 42);
+            $('#edit_ts').val(res.test_size         ?? 0.2);
+            $('#edit_ad').val(res.alpha_donor       ?? 0.2);
+            $('#edit_au').val(res.alpha_ulang       ?? 0.1);
+            const savedGol = Array.isArray(res.filter_golongan_darah) ? res.filter_golongan_darah : [];
+            $('.edit-gol').each(function () {
+                $(this).prop('checked', savedGol.includes($(this).val()));
+            });
+            $('#edit_kecamatan').val(res.filter_kecamatan         ?? '');
+            $('#edit_jk').val(res.filter_jenis_kelamin             ?? '');
+            $('#edit_tgl_dari').val(res.filter_tanggal_dari        ?? '');
+            $('#edit_tgl_sampai').val(res.filter_tanggal_sampai    ?? '');
+            $('#edit_min_donor').val(res.filter_min_jumlah_donor   ?? 1);
             $('#modalEdit').modal('show');
         }, 'json');
     });
@@ -707,7 +701,6 @@ $(function () {
         const nama = $(this).data('nama');
         lastTrainedId = id;
 
-        // Reset state modal
         stopTimers();
         setProgress(0, 'Mempersiapkan...');
         $('#trainingNama').text(nama);
@@ -718,24 +711,26 @@ $(function () {
         $('#trainingElapsed').text('Waktu berjalan: 0 detik');
         $('#trainingBar').removeClass('bg-success').addClass('bg-primary progress-bar-animated');
         $('#btnAktifkanSetelahTraining').hide();
-        $('#modalTraining').modal('show');
 
+        // Reset info alert ke angka total (sebelum filter diketahui)
+        $('#trainingInfoAlert').removeClass('alert-success').addClass('alert-info');
+        $('#trainingInfoText').html(
+            'Data keseluruhan: <strong>' + TOTAL_HISTORIS.toLocaleString() + ' historis</strong>' +
+            ' dan <strong>' + TOTAL_PENDONOR.toLocaleString() + ' pendonor</strong>.' +
+            ' Jumlah aktual akan disesuaikan dengan filter konfigurasi model. Proses 30–120 detik.'
+        );
+
+        $('#modalTraining').modal('show');
         startElapsed();
 
-        // ── Kirim request training (blocking di server ~30-120 detik)
         $.ajax({
             url     : '<?= site_url('model-prediksi/training') ?>',
             type    : 'POST',
             data    : { id_model: id },
             dataType: 'json',
-            timeout : 360000,   // 6 menit
-            // beforeSend: mulai polling setelah sedikit delay agar file progress sempat dibuat
+            timeout : 360000,
             beforeSend: function () {
                 setTimeout(function () {
-                    // Ambil ts dari file-name prefix yang dikirim balik dari server
-                    // Karena belum tahu ts, kita polling dengan id saja dan tunggu
-                    // polling-by-id endpoint (ts akan dikembalikan di response)
-                    // Sementara itu tampilkan animasi step manual sebagai fallback
                     let fakeStep = 0;
                     const fakeSteps = [
                         [5,  'Memuat library Python...'],
@@ -748,8 +743,6 @@ $(function () {
                         [80, 'Cross-validation 5-fold...'],
                         [95, 'Menyimpan model...'],
                     ];
-                    // Jalankan animasi step fake setiap ~8 detik sebagai fallback
-                    // (akan di-override oleh polling nyata segera setelah ts diketahui)
                     pollTimer = setInterval(function () {
                         if (fakeStep < fakeSteps.length) {
                             const [p, s] = fakeSteps[fakeStep++];
@@ -761,8 +754,6 @@ $(function () {
             success: function (res) {
                 stopTimers();
                 const durasi = elapsedSec;
-
-                // Set progress 100% sebelum transisi ke hasil
                 setProgress(100, 'Selesai!');
 
                 setTimeout(function () {
@@ -772,14 +763,38 @@ $(function () {
                     if (res.status !== 'success') {
                         $('#trainingError').show();
                         $('#trainingErrorMsg').text(res.message);
+                        // Update alert ke merah saat error
+                        $('#trainingInfoAlert').removeClass('alert-info').addClass('alert-danger');
                         return;
                     }
 
+                    // ── UPDATE INFO ALERT dengan angka AKTUAL setelah filter ──
+                    // total_raw  = data yang dikirim ke Python (post-filter PHP)
+                    // total_data = data yang benar-benar dipakai Python (post-normalisasi)
+                    const totalRaw  = res.total_raw  || 0;
+                    const totalData = res.total_data || 0;
+                    const dist      = res.label_dist || {};
+
+                    let infoHtml = '<i class="fas fa-check-circle me-1"></i>' +
+                        'Data setelah filter: <strong>' + totalRaw.toLocaleString() + ' baris</strong>' +
+                        ' → dipakai training: <strong>' + totalData.toLocaleString() + ' baris</strong>' +
+                        ' (setelah normalisasi Python).';
+
+                    // Tampilkan catatan jika ada baris yang gugur di Python
+                    if (totalRaw > totalData) {
+                        const gugur = totalRaw - totalData;
+                        infoHtml += ' <span class="text-warning">' + gugur.toLocaleString() +
+                            ' baris diabaikan</span> (data tidak lengkap / tanggal kosong).';
+                    }
+
+                    $('#trainingInfoAlert').removeClass('alert-info alert-danger').addClass('alert-success');
+                    $('#trainingInfoText').html(infoHtml);
+
+                    // ── Tampilkan hasil metrik ────────────────────────────────
                     $('#trainingResult').show();
                     $('#btnAktifkanSetelahTraining').show();
                     $('#trainingDurasi').text('Selesai dalam ' + durasi + ' detik');
 
-                    const dist = res.label_dist || {};
                     $('#resultMetrics').html(`
                         <div class="col-3"><div class="card p-2 border-primary">
                             <p class="text-muted mb-0" style="font-size:10px">AKURASI</p>
@@ -798,11 +813,12 @@ $(function () {
                             <h4 class="fw-bold text-info mb-0">${parseFloat(res.cv_roc_auc).toFixed(4)}</h4>
                         </div></div>
                     `);
-                    $('#resultInfo').html(`
-                        <strong>Total data digunakan:</strong> ${res.total_data.toLocaleString()} baris &nbsp;|&nbsp;
-                        <strong>Label 0 (tidak kembali):</strong> ${(dist['0'] || 0).toLocaleString()} &nbsp;|&nbsp;
-                        <strong>Label 1 (kembali):</strong> ${(dist['1'] || 0).toLocaleString()}
-                    `);
+
+                    $('#resultInfo').html(
+                        '<strong>Total data training:</strong> ' + totalData.toLocaleString() + ' baris &nbsp;|&nbsp;' +
+                        '<strong>Label 0 (tidak kembali):</strong> ' + (dist['0'] || 0).toLocaleString() + ' &nbsp;|&nbsp;' +
+                        '<strong>Label 1 (kembali):</strong> ' + (dist['1'] || 0).toLocaleString()
+                    );
                 }, 600);
             },
             error: function (xhr) {
@@ -811,6 +827,7 @@ $(function () {
                 $('#trainingProgress').hide();
                 $('#trainingError').show();
                 $('#trainingFooter').show();
+                $('#trainingInfoAlert').removeClass('alert-info').addClass('alert-danger');
                 $('#trainingErrorMsg').text(
                     xhr.status === 0
                         ? 'Koneksi terputus atau request timeout. Coba lagi.'
@@ -860,9 +877,7 @@ $(function () {
     });
 
     // ── Bersihkan timer saat modal ditutup ────────────────────
-    $('#modalTraining').on('hidden.bs.modal', function () {
-        stopTimers();
-    });
+    $('#modalTraining').on('hidden.bs.modal', function () { stopTimers(); });
 
 });
 </script>

@@ -1,4 +1,5 @@
 <?php
+// app/Database/Migrations/2026-02-22-000001_CreateModelPrediksiTable.php
 
 namespace App\Database\Migrations;
 
@@ -18,11 +19,6 @@ class CreateModelPrediksiTable extends Migration
                 'type'       => 'VARCHAR',
                 'constraint' => 100,
                 'null'       => false,
-            ],
-            'parameter_model' => [
-                'type' => 'TEXT',
-                'null' => true,
-                'comment' => 'JSON: n_estimators, min_samples_leaf, class_weight, test_size, alpha_donor, alpha_ulang, random_state',
             ],
             'akurasi_model' => [
                 'type'       => 'DECIMAL',
@@ -59,6 +55,7 @@ class CreateModelPrediksiTable extends Migration
                 'type'       => 'ENUM',
                 'constraint' => ['aktif', 'nonaktif'],
                 'default'    => 'nonaktif',
+                'null'       => false,
             ],
             'id_user' => [
                 'type'       => 'VARCHAR',
